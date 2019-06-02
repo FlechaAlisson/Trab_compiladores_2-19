@@ -1,0 +1,213 @@
+
+options {
+    static = false;
+}
+	PARSER_BEGIN(Compilador)
+
+package tree;
+import java.io.*;
+import java.io.FileNotFoundException;
+	public class Compilador {
+	    int contador_de_erro_lexico = 0;
+	    public static void main(String[] args) throws FileNotFoundException{
+
+			
+	        Compilador parser = new Compilador( new FileInputStream("C:\\Users\\USER\\Desktop\\programas_comp\\arquivo.txt")); // abre arquivo a ser analisado
+	        try {  // cria AS
+	            parser.start();   // chama o método que faz a análise
+	        }
+	        catch (ParseException e) {
+	         	e.printStackTrace();
+	         }
+	         finally {
+	           System.out.println("deu certo");
+	            
+	         } 
+	    }
+
+
+	}
+	PARSER_END(Compilador)
+
+	SKIP :
+	{
+			" "
+		|	"\t"
+		|	"\n"
+		|	"\r"
+		|	<"//" (~["\n","\r"])* ("\n" | "\r" | "\r\n")				>
+		|	<"/*" (~["*"])* "*" ("*" | ~["*","/"] (~["*"])* "*")* "/"	>
+		|	"#" 	: PREPROCESSOR_OUTPUT
+	}
+
+	<PREPROCESSOR_OUTPUT> SKIP:
+	{
+	    "\n" : DEFAULT
+	}
+
+
+	TOKEN : /* PALAVRAS RESERVADAS */
+	{
+			< MAIN 		: "main" 	>
+		|	< IF 		: "if" 		>
+		| 	< ELSE 		: "else" 	>
+		| 	< FOR	    : "for" 	>
+		|   < RETURN    : "return"  >
+	    |   < INT       : "int"     >
+		|   < CHAR      : "char"    >
+	    |   < FLOAT     : "float"   >
+	    | 	< DOUBLE    : "double"  >
+	    |   < VOID      : "void"    >
+	    |   < WHILE     : "while"   >
+
+	}
+
+	TOKEN : /* OPERADORES NUMÉRICOS */
+	{
+		    < AS        : "="   >
+		|   < PLUS      : "+"   >
+		|   < MINUS     : "-"   >
+		|   < MULT      : "*"   >
+		|   < DIV       : "/"   >
+		|   < REM       : "%"   >
+	}
+
+	TOKEN : { /*OPERADORES LÓGICOS*/
+
+		  	< GT        : ">"   >
+		|   < LT        : "<"   >
+		|   < EQ        : "=="  >
+		|   < LE        : "<="  >
+		|   < GE        : ">="  >
+		|   < NEQ       : "!="  >
+		|   < AND       : "&&"  >
+		|   < OR        : "||"  >
+	}
+
+	TOKEN : /*SÍMBOLOS ESPECIAIS*/
+	{
+	        < LPAREN    : "("   >
+	    |   < RPAREN    : ")"   >
+	    |   < LBRACE    : "{"   >
+	    |   < RBRACE    : "}"   >
+	    |   < LBRACKET  : "["   >
+	    |   < RBRACKET  : "]"   >
+	    |   < SEMICOLON : ";"   >
+	    |   < COMMA     : ","   >
+	    |   < DOT       : "."   >
+	}
+
+	TOKEN : /*CONSTANTES*/
+	{
+	        < int_constant      :   (  // números decimais, octais, hexadecimais ou binários
+	                                (["0"-"9"] (["0"-"9"])* )
+	                            |   (["0"-"7"] (["0"-"7"])* ["o", "O"] )
+	                            |   (["0"-"9"] (["0"-"7","A"-"F","a"-"f"])* ["h", "H"] )
+	                            |   (["0"-"1"] (["0"-"1"])* ["b", "B"])
+	                                ) >
+	        |
+	        < string_constant   :  "\"" ( ~["\"","\\","\n","\r"] | "\\" ( ["n","t","b","r","f","\\","\'","\""] | ["0"-"7"] (["0"-"7"])?  | ["0"-"3"] ["0"-"7"] ["0"-"7"] | ( ["\n","\r"] | "\r\n")))* "\""   >
+	        |
+	        < null_constant     :   "null" >
+	}
+
+
+	TOKEN : /*IDENTIFICADORES*/
+	{
+			<IDENT  		: <LETTER> (<LETTER> | <DIGIT> | "_" )*	>
+		|	<#LETTER		: ["A"-"Z","a"-"z"]		        	>
+		|	<#DIGIT			: ["0"-"9"]							>
+	}
+
+
+	void start():{}{
+	      <MAIN> [comand_block()]
+	}
+
+	void comand_block():{}{
+	    <LBRACE>(comand_line())*<RBRACE>
+	}
+
+	void comand_line():{}{
+	    ((LOOKAHEAD(2) exp_log() | (LOOKAHEAD(2) exp_num() | assignment_var()))
+	   				  |for_declaration()
+	   				  |if_declaration()
+	   				  |(LOOKAHEAD(3)func()
+	   				  | var_declaration())
+	   				  |  while_declaration()
+	   				  )<SEMICOLON>  
+	}
+
+
+	void type(): { } {
+		(<VOID> |  <INT> | <CHAR> | <FLOAT> | <DOUBLE>)
+	  }
+
+	void log_op(): { } {
+		(<OR> | <AND> | <NEQ>| <GE> | <LE> | <EQ>| <LT>  | <GT> )
+	}
+	
+	void var_declaration(): { } {
+	  (LOOKAHEAD(2)(type() < IDENT >) |(type() assignment_var()))
+		
+	}
+	void exp_log(): {}{
+	    (<IDENT> | <int_constant>)log_op()(<IDENT> | <int_constant>)
+	}
+
+	void num_op(): { } {
+		(<PLUS> | <MINUS> | <MULT> | <DIV> | <REM> )
+	} 
+
+	void exp_num() : {}{
+	    (<IDENT> | <int_constant>) num_op() (<IDENT> | <int_constant>)
+	}
+
+	void for_declaration():{}{
+	    <FOR><LPAREN>assignment_var()<SEMICOLON>exp_log()<SEMICOLON>op_in_the_same_var()<RPAREN>comand_block()
+	}
+
+	void op_in_the_same_var(): {}{
+	    <IDENT>(<PLUS><PLUS> | <MINUS><MINUS> | <MULT><MULT> | <DIV><DIV> | <REM><REM> )
+	}
+
+	void assignment_var():{}{
+
+	   <IDENT> <AS> ((LOOKAHEAD(2) <int_constant> | (LOOKAHEAD(2) exp_num() | exp_log())))+
+	}
+
+	void if_declaration(): {}{
+	    <IF><LPAREN>( LOOKAHEAD(2) exp_num()| exp_log())<RPAREN>comand_block() [else_declaration()]
+	}
+
+	void else_declaration() : {}{
+	    <ELSE> comand_block()
+	}
+
+	void func_name() :{}{
+	    (<VOID> |  <INT> | <CHAR> | <FLOAT> | <DOUBLE>) <IDENT> param_list()
+	}
+
+	void param_list() :{}{
+	   LOOKAHEAD(2) <LPAREN>(<VOID> |  <INT> | <CHAR> | <FLOAT> | <DOUBLE>)<IDENT><RPAREN>  |
+	     <LPAREN>((<VOID> |  <INT> | <CHAR> | <FLOAT> | <DOUBLE>)<IDENT><COMMA>)+<RPAREN>
+	}
+
+	void func():{}{
+	    func_name() comand_block_func()
+	}
+
+	void comand_block_func(): { } {
+		comand_block() return_declaration()
+	}
+
+	void return_declaration(): { } {
+
+	  < RETURN > (<int_constant> | < IDENT >)		
+	}
+
+	void while_declaration(): { } {
+	<WHILE> <LPAREN>( LOOKAHEAD(2) exp_num()| exp_log())<RPAREN>comand_block()
+	}
+
+
